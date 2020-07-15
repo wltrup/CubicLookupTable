@@ -1,8 +1,8 @@
 import Foundation
 import RandomAccessCollectionBinarySearch
 
-/// Builds a look-up table for a given function `f(x)` in the interval `a ≤ x ≤ b`,
-/// using *dynamic sampling* and *cubic* interpolation.
+/// Builds a look-up table for a given function `f(x)` and its first derivative, `f'(x)`,
+/// in the interval `a ≤ x ≤ b`, using *dynamic sampling* and *cubic* interpolation.
 
 public struct CubicLookupTable <T: BinaryFloatingPoint> {
 
@@ -26,13 +26,14 @@ public struct CubicLookupTable <T: BinaryFloatingPoint> {
     /// Note that `df` must satisfy the condition `df > 0`.
     public let df: T
 
-    /// The number of pairs of values `(x, f(x))` stored in the table.
+    /// The number of triplets of values `(x, f(x), f'(x))` stored in the table.
     public var size: Int { table.count }
 
     /// Returns the value of `f(x)` by retrieving it from the table, if it exists there,
-    /// or computes it by interpolating between the two values in the table that bracket
-    /// the argument `x`. Note that `x` should be in the closed range `[a,b]`. No error
-    /// is produced if it's not, and a result is interpolated, but it may be wildly innacurate.
+    /// or computes it by (cubic) interpolating between the two values in the table that
+    /// bracket the argument `x`. Note that `x` should be in the closed range `[a,b]`. No
+    /// error is produced if it's not, and a result is interpolated, but it may be wildly
+    /// innacurate.
     ///
     /// - Parameter x:
     /// The value for which to retrieve or compute `f(x)`. For accurate results, make sure
@@ -43,6 +44,25 @@ public struct CubicLookupTable <T: BinaryFloatingPoint> {
     ///
     public func f(_ x: T) -> T {
         retrieveF(for: x)
+    }
+
+    /// Returns the value of `f'(x)` (the first derivative of `f` computed at `x`) by
+    /// retrieving it from the table, if it exists there, or computes it by (linearly)
+    /// interpolating between the two values in the table that bracket the argument `x`.
+    /// Note that `x` should be in the closed range `[a,b]`. No error is produced if
+    /// it's not, and a result is interpolated, but it may be wildly innacurate. The
+    /// interpolation of `f'(x)` is linear because its cubic interpolation would require
+    /// values for the second derivative.
+    ///
+    /// - Parameter x:
+    /// The value for which to retrieve or compute `f'(x)`. For accurate results, make sure
+    /// that `x` is in the range `[a,b]`.
+    ///
+    /// - Returns:
+    /// The retrieved or computed value of `f'(x)`.
+    ///
+    public func fprime(_ x: T) -> T {
+        retrieveFprime(for: x)
     }
 
     /// Initialises a look-up table.
@@ -111,7 +131,7 @@ public struct CubicLookupTable <T: BinaryFloatingPoint> {
     private var f: (X) -> FX
     private var fp: (X) -> FPX
 
-    private var table: [X: FX] = [:]
+    private var table: [X: (FX, FPX)] = [:]
     private var sortedXs: [X] = []
 
 }
@@ -122,7 +142,7 @@ extension CubicLookupTable {
 
     private mutating func buildTheTable() {
 
-        var table: [X: FX] = [:]
+        var table: [X: (FX, FPX)] = [:]
         var sortedXs: [X] = []
 
         let sizeUpperBound = Int(ceil(abs(b-a) / dxMin)) + 1
@@ -138,9 +158,10 @@ extension CubicLookupTable {
             x += dx
             x = min(x, b)
             f = self.f(x)
-            table[x] = f
+            fp = self.fp(x)
+            table[x] = (f, fp)
             sortedXs += [x]
-            fp = abs(self.fp(x))
+            fp = abs(fp)
             dx = fp == .zero
                 ? dxMax
                 : df / fp
@@ -155,11 +176,49 @@ extension CubicLookupTable {
     @inline(__always)
     private func retrieveF(for x: X) -> FX {
 
-        if let f = table[x] {
+        if let (f, _) = table[x] {
             // x itself is in the table, so just return
             // its stored f(x) value
             return f
         }
+
+        let (xk, xkp1, xkp1mxk) = retrieveXkXkp1(for: x)
+
+        let (fk, fpk) = table[xk]!
+        let (fkp1, fpkp1) = table[xkp1]!
+
+        let xkp1mxksq = xkp1mxk * xkp1mxk
+        let fkp1mfk = fkp1 - fk
+        let fpkp1pfpk = fpkp1 + fpk
+
+        let b = ( 3 * fkp1mfk - (fpkp1pfpk + fpk) * xkp1mxk ) / xkp1mxksq
+        let c = ( fpkp1pfpk * xkp1mxk - 2 * fkp1mfk ) / (xkp1mxksq * xkp1mxk)
+
+        let xmxk = (x - xk)
+        return fk + (fpk + (b + c * xmxk) * xmxk) * xmxk
+
+    }
+
+    @inline(__always)
+    private func retrieveFprime(for x: X) -> FX {
+
+        if let (_, fp) = table[x] {
+            // x itself is in the table, so just return
+            // its stored f'(x) value
+            return fp
+        }
+
+        let (xk, xkp1, xkp1mxk) = retrieveXkXkp1(for: x)
+
+        let (_, fpk) = table[xk]!
+        let (_, fpkp1) = table[xkp1]!
+
+        return fpk + (fpkp1 - fpk) * (x - xk) / xkp1mxk
+
+    }
+
+    @inline(__always)
+    private func retrieveXkXkp1(for x: X) -> (xk: FX, xkp1: FX, xkp1mxk: FX) {
 
         let xk: X
         let xkp1: X
@@ -181,10 +240,7 @@ extension CubicLookupTable {
         let xkp1mxk = xkp1 - xk
         guard xkp1mxk > 0 else { fatalError("x_(k+1) ≤ x_(k) but should not be, for x = \(x)") }
 
-        let fk = table[xk]!
-        let fkp1 = table[xkp1]!
-
-        return fk + (fkp1 - fk) * ((x - xk) / xkp1mxk)
+        return (xk, xkp1, xkp1mxk)
 
     }
 
