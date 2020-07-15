@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "RandomAccessCollectionBinarySearch",
+        "repositoryURL": "https://github.com/wltrup/RandomAccessCollectionBinarySearch.git",
+        "state": {
+          "branch": null,
+          "revision": "ca857352eb57056a51e20e7faf1fb5c35aac32e4",
+          "version": "0.1.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}
