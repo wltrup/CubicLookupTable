@@ -7,7 +7,7 @@
 
 ## What
 
-**CubicLookupTable** is a Swift Package Manager package for iOS/tvOS (10.0 and above), watchOS (4.0 and above), and macOS (10.14 and above), under Swift 5.0 and above,  that efficiently implements a generic (in the Swift sense) *cubic*-interpolated and dynamically-sampled look-up table: given a function `f(x)` and its derivative `f'(x)`, a table is built that stores values of `x` and `f(x)` at specific points in some interval `[a,b]` provided by the client code. The derivative is necessary to dynamically determine  where to sample `f(x)` for maximum efficiency and accuracy.
+**CubicLookupTable** is a Swift Package Manager package for iOS/tvOS (10.0 and above), watchOS (4.0 and above), and macOS (10.14 and above), under Swift 5.0 and above,  that efficiently implements a generic (in the Swift sense) *cubic*-interpolated and dynamically-sampled look-up table: given a function `f(x)` and its derivative `f'(x)`, a table is built that stores values of `x`,  `f(x)`, and `f'(x)` at specific points in some interval `[a,b]` provided by the client code. The derivative is necessary to dynamically determine  where to sample `f(x)` for maximum efficiency and accuracy.
 
 For a *linearly*-interpolated version of this package, head to [LinearLookupTable](https://github.com/wltrup/LinearLookupTable).
 
@@ -36,13 +36,14 @@ public struct CubicLookupTable <T: BinaryFloatingPoint> {
     /// Note that `df` must satisfy the condition `df > 0`.
     public let df: T
 
-    /// The number of pairs of values `(x, f(x))` stored in the table.
+    /// The number of triplets of values `(x, f(x), f'(x))` stored in the table.
     public var size: Int
 
     /// Returns the value of `f(x)` by retrieving it from the table, if it exists there,
-    /// or computes it by interpolating between the two values in the table that bracket
-    /// the argument `x`. Note that `x` should be in the closed range `[a,b]`. No error
-    /// is produced if it's not, and a result is interpolated, but it may be wildly innacurate.
+    /// or computes it by (cubic) interpolating between the two values in the table that
+    /// bracket the argument `x`. Note that `x` should be in the closed range `[a,b]`. No
+    /// error is produced if it's not, and a result is interpolated, but it may be wildly
+    /// innacurate.
     ///
     /// - Parameter x:
     /// The value for which to retrieve or compute `f(x)`. For accurate results, make sure
@@ -52,6 +53,23 @@ public struct CubicLookupTable <T: BinaryFloatingPoint> {
     /// The retrieved or computed value of `f(x)`.
     ///
     public func f(_ x: T) -> T
+
+    /// Returns the value of `f'(x)` (the first derivative of `f` computed at `x`) by
+    /// retrieving it from the table, if it exists there, or computes it by (linearly)
+    /// interpolating between the two values in the table that bracket the argument `x`.
+    /// Note that `x` should be in the closed range `[a,b]`. No error is produced if
+    /// it's not, and a result is interpolated, but it may be wildly innacurate. The
+    /// interpolation of `f'(x)` is linear because its cubic interpolation would require
+    /// values for the second derivative.
+    ///
+    /// - Parameter x:
+    /// The value for which to retrieve or compute `f'(x)`. For accurate results, make sure
+    /// that `x` is in the range `[a,b]`.
+    ///
+    /// - Returns:
+    /// The retrieved or computed value of `f'(x)`.
+    ///
+    public func fprime(_ x: T) -> T
 
     /// Initialises a look-up table.
     ///
