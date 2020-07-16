@@ -3,7 +3,7 @@
 [![Xcode](https://img.shields.io/badge/Xcode-11-blueviolet.svg)](https://developer.apple.com/xcode)
 [![Swift](https://img.shields.io/badge/Swift-5.0-orange.svg)](https://swift.org)
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/wltrup/CubicLookupTable)
-![GitHub](https://img.shields.io/github/license/wltrup/CubicLookupTable/LICENSE)
+![GitHub](https://img.shields.io/github/license/wltrup/CubicLookupTable)
 
 ## What
 
